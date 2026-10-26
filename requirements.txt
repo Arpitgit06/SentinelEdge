@@ -1,0 +1,32 @@
+# Sentinel Edge — pinned, known-good package set for the project venv (.venv)
+# Setup: setup.bat installs EXACTLY these into .\.venv — never into the global
+# Python. Tested on CPython 3.11 / Windows 10-11 (see setup.bat for details).
+#
+# Core runtime
+fastapi==0.138.0
+uvicorn==0.49.0
+pydantic==2.13.4
+starlette==1.3.1
+httpx==0.28.1                # fastapi.testclient (test suite)
+PyYAML==6.0.3
+psutil==7.2.2
+plyer==2.1.0                 # toast fallback (console -> plyer -> windows-toasts)
+windows-toasts==1.3.1        # native Win10/11 toast with the Allow-once button
+#
+# Packet / detection
+scapy==2.8.0                 # crafting, replay, harness scenarios (not hot path)
+pydivert==4.0.1              # WinDivert enforcement driver (Windows)
+pyahocorasick==2.3.1         # signature multi-pattern matching
+#
+# ML / data
+numpy==2.4.6
+pandas==3.1.0
+scipy==1.17.1
+scikit-learn==1.9.0
+joblib==1.5.3
+lightgbm==4.7.0
+#
+# Optional extras (uncomment to install; not required for any core feature)
+# onnxruntime>=1.17          # ONNX inference backend (sentinel/ml/export_onnx.py)
+# skl2onnx>=1.16             # ONNX export tooling
+# onnxmltools>=1.11

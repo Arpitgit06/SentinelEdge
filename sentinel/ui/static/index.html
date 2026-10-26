@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sentinel Edge — Local Adaptive Firewall</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="logo">&#128737;</span>
+    <div>
+      <h1>Sentinel Edge</h1>
+      <p class="sub">Local adaptive firewall — nothing leaves this machine</p>
+    </div>
+  </div>
+  <div class="health">
+    <span id="driver-badge" class="badge">driver: -</span>
+    <span id="stat-blocked" class="badge red">blocked: 0</span>
+    <span id="stat-quar" class="badge amber">quarantined: 0</span>
+    <span id="stat-allowed" class="badge green">allowed: 0</span>
+  </div>
+</header>
+
+<section class="filters">
+  <input id="f-src" placeholder="filter source ip">
+  <input id="f-stage" placeholder="stage (reputation/signatures/protocol/behaviour/flow_ml)">
+  <input id="f-q" placeholder="search reasons/evidence">
+  <select id="f-action">
+    <option value="">all actions</option>
+    <option value="block">blocked</option>
+    <option value="quarantine">quarantined</option>
+    <option value="allow">allowed</option>
+  </select>
+  <button onclick="loadEvents()">Apply</button>
+</section>
+
+<main>
+  <table class="events">
+    <thead>
+      <tr><th>time</th><th>action</th><th>source &rarr; dest</th>
+          <th>stage / reason</th><th>plain-language alert</th><th></th></tr>
+    </thead>
+    <tbody id="event-rows"></tbody>
+  </table>
+</main>
+
+<dialog id="detail">
+  <div class="dialog-bar"><strong>Event detail</strong>
+    <button onclick="document.getElementById('detail').close()">close</button></div>
+  <pre id="detail-body" class="detail-json"></pre>
+</dialog>
+
+<footer>
+  <p>Sentinel Edge &mdash; defensive only, lab-first. Loopback/DHCP/DNS always allowed; fail-open by design.</p>
+</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+function fmtRow(ev) {
+  const tr = document.createElement('tr');
+  const time = (ev.iso || '').slice(11, 19);
+  const action = ev.action || '';
+  tr.className = 'row-' + action;
+  tr.innerHTML = `
+    <td class="mono">${time}</td>
+    <td><span class="pill pill-${action}">${action}</span></td>
+    <td class="mono">${ev.src || ''}:${ev.src_port || ''} &rarr; ${ev.dst || ''}:${ev.dst_port || ''}</td>
+    <td><strong>${ev.stage || ''}</strong><br>${(ev.reason || '').replace(/</g,'&lt;')}</td>
+    <td class="plain">${(ev.plain || '').replace(/</g,'&lt;')}</td>
+    <td>
+      ${action !== 'allow' ? `<button onclick="allowOnce(${ev.id})">Allow once</button>` : ''}
+      <button onclick="showDetail(${ev.id})">detail</button>
+    </td>`;
+  return tr;
+}
+
+async function loadEvents() {
+  const q = new URLSearchParams();
+  if ($('f-src').value) q.set('src', $('f-src').value);
+  if ($('f-stage').value) q.set('stage', $('f-stage').value);
+  if ($('f-q').value) q.set('q', $('f-q').value);
+  if ($('f-action').value) q.set('action', $('f-action').value);
+  q.set('limit', '100');
+  const rows = await api('/api/events?' + q.toString());
+  const tb = $('event-rows'); tb.innerHTML = '';
+  for (const r of rows) tb.appendChild(fmtRow(r));
+}
+
+async function allowOnce(id) {
+  await api('/api/events/' + id + '/allow-once', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ttl_seconds: 300 }),
+  });
+  loadEvents();
+}
+
+async function showDetail(id) {
+  const ev = await api('/api/events/' + id);
+  $('detail-body').textContent = JSON.stringify(ev, null, 2);
+  $('detail').showModal();
+}
+
+async function refreshStats() {
+  try {
+    const s = await api('/api/stats');
+    $('stat-blocked').textContent = 'blocked: ' + (s.db_stats?.block ?? 0);
+    $('stat-quar').textContent = 'quarantined: ' + (s.db_stats?.quarantine ?? 0);
+    $('stat-allowed').textContent = 'allowed sessions: ' + (s.engine_stats?.allowed ?? 0);
+    $('driver-badge').textContent = 'driver: ' + (s.driver || 'none');
+  } catch (e) { /* dashboard polls */ }
+}
+
+let _reloadTimer = null;
+
+function reloadSoon() {
+  // coalesce bursts (flood scenario emits many alerts) into one re-render
+  if (_reloadTimer) return;
+  _reloadTimer = setTimeout(() => { _reloadTimer = null; loadEvents(); }, 500);
+}
+
+async function connectStream() {
+  const ws = new WebSocket((location.origin + '/api/stream').replace('http', 'ws'));
+  ws.onmessage = () => reloadSoon();
+  ws.onclose = () => setTimeout(connectStream, 3000);
+}
+
+window.onload = () => { loadEvents(); refreshStats(); connectStream();
+  setInterval(refreshStats, 5000); setInterval(loadEvents, 15000); };
+</script>
+</body>
+</html>

@@ -1,0 +1,127 @@
+# Sentinel Edge sample rules — compact Snort/Suricata-inspired subset.
+#
+# Fields:
+#   id            unique rule id
+#   action        drop | alert
+#   proto         any | tcp | udp | icmp
+#   dst_port      ports or "any"
+#   content       list of literal phrases compiled into the Aho-Corasick automaton
+#   case_sensitive true|false (default false)
+#   msg           plain-language reason surfaced in alerts
+#   severity      low | medium | high
+#
+# These are example/lab rules; extend freely. Keep contents literal (the
+# automaton matches raw bytes case-insensitively unless case_sensitive: true).
+
+rules:
+  - id: exploit.locky.header
+    action: drop
+    proto: any
+    dst_port: any
+    content:
+      - "%PDF-1.7\\n%%EOF\\n/watchdogs"
+    case_sensitive: true
+    msg: "Known ransomware dropper header pattern"
+    severity: high
+
+  - id: exploit.eternal_blue
+    action: drop
+    proto: any
+    dst_port: [445]
+    content:
+      - "\xB7\x00\x00\xC0"      # SMB lateral-movement pattern (lab Metasploit)
+      - "with_memwrite"
+    case_sensitive: false
+    msg: "SMB exploit pattern (EternalBlue-class) in payload"
+    severity: high
+
+  - id: web.sql_injection
+    action: drop
+    proto: tcp
+    dst_port: [80, 8080, 8000]
+    content:
+      - "union select"
+      - "select * from information_schema"
+      - "1=1 or '1'='1"
+      - "; drop table "
+    msg: "SQL-injection attempt against a web service"
+    severity: high
+
+  - id: web.path_traversal
+    action: drop
+    proto: tcp
+    dst_port: [80, 8080, 8000]
+    content:
+      - "../../etc/passwd"
+      - "%2e%2e%2f"
+      - "/etc/shadow"
+    msg: "Path traversal / local file read attempt"
+    severity: high
+
+  - id: web.command_injection
+    action: drop
+    proto: tcp
+    dst_port: any
+    content:
+      - "; cat /etc/passwd"
+      - "&& del /q "
+      - "| nc -e /bin/bash"
+    msg: "Remote command execution attempt"
+    severity: high
+
+  - id: malware.naming
+    action: alert
+    proto: any
+    dst_port: any
+    content:
+      - "x86/shikata_ga_nai"
+      - "meterpreter"
+      - "reverse_tcp"
+      - "cve-2021-44228"
+      - "log4j rce"
+    msg: "Known exploit-toolkit keyword in payload"
+    severity: high
+
+  - id: scanner.nikto
+    action: alert
+    proto: tcp
+    dst_port: [80, 8080, 443]
+    content:
+      - "nikto/"
+      - "sqlmap/"
+      - "acunetix"
+      - "wpscan"
+    case_sensitive: false
+    msg: "Automated web-scanner user agent probed this host"
+    severity: medium
+
+  - id: malware.eicar_test
+    action: drop
+    proto: any
+    dst_port: any
+    content:
+      - "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+    case_sensitive: true
+    msg: "EICAR antivirus test file detected in payload"
+    severity: high
+
+  - id: brute.hydra_banner
+    action: alert
+    proto: tcp
+    dst_port: [21, 22, 23, 445, 3389]
+    content:
+      - "hydra"
+      - "patator"
+      - "medusa"
+    msg: "Brute-force toolkit banner observed on a login service"
+    severity: medium
+
+  - id: beacon.dga_like
+    action: alert
+    proto: any
+    dst_port: any
+    content:
+      - "c2 beacon"
+      - "malware beacon"
+    msg: "Command-and-control beacon keyword"
+    severity: medium
