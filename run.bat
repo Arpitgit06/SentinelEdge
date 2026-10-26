@@ -30,12 +30,13 @@ echo.
 echo  [i] not running as Administrator: observe-only, fail-open mode.
 echo      Detectors run and events stream to the dashboard, nothing is blocked.
 if /i "%~1"=="observe" goto :run
+if /i "%~1"=="admin" goto :do_elevate
 if defined SILENT goto :run
 choice /C YN /T 12 /D N /N /M "Relaunch elevated to enable blocking mode (UAC prompt)? [Y/N] "
 if errorlevel 2 goto :run
 :do_elevate
 echo  [i] waiting for the UAC prompt (answering no falls back to observe-only) ...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Start-Process -FilePath '%~f0' -ArgumentList 'observe' -Verb RunAs } catch { exit 1 }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Start-Process -FilePath '%~f0' -Verb RunAs } catch { exit 1 }"
 if not errorlevel 1 exit /b 0
 echo  [warn] elevation was refused or failed -- continuing unprivileged.
 goto :run
