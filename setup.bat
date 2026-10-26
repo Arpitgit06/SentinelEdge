@@ -92,7 +92,7 @@ set "STEP=pip install -r requirements.txt"
 if errorlevel 1 goto :die
 
 echo       import sanity check inside .venv ...
-".venv\Scripts\python.exe" -c "import fastapi, uvicorn, numpy, pandas, sklearn, lightgbm, scapy, pydivert, ahocorasick, yaml, psutil, httpx; import sentinel.main, harness.runner, tools.update_blocklists"
+".venv\Scripts\python.exe" -c "import fastapi, uvicorn, websockets, numpy, pandas, sklearn, lightgbm, scapy, pydivert, ahocorasick, yaml, psutil, httpx; import sentinel.main, harness.runner, tools.update_blocklists"
 if errorlevel 1 goto :die
 
 rem -- blocklists (network step; tolerated offline with a warning) -----------------
